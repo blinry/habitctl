@@ -1,0 +1,9 @@
+[package]
+name = "tick"
+version = "0.1.0"
+authors = ["Sebastian Morr <sebastian@morr.cc>"]
+
+[dependencies]
+chrono = "0.4"
+rprompt = "1.0"
+clap = "2.31.2"
