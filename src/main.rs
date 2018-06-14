@@ -75,8 +75,12 @@ impl Tick {
             .open(&self.log_file)
             .unwrap();
 
-        if self.last_date() != entry.date {
-            write!(&file, "\n");
+        let last_date = self.last_date();
+
+        if let Some(last_date) = last_date {
+            if last_date != entry.date {
+                write!(&file, "\n");
+            }
         }
 
         write!(
@@ -222,8 +226,11 @@ impl Tick {
         habits
     }
 
-    fn last_date(&self) -> String {
-        self.get_entries().last().unwrap().date.clone()
+    fn last_date(&self) -> Option<String> {
+        match self.get_entries().last() {
+            Some(entry) => Some(entry.date.clone()),
+            None => None,
+        }
     }
 
     /*
