@@ -28,7 +28,8 @@ fn main() {
         .subcommand(SubCommand::with_name("todo").about("Print unresolved tasks for today"))
         .get_matches();
 
-    let tick = Tick::new();
+    let mut tick = Tick::new();
+    tick.load();
 
     match matches.subcommand() {
         ("log", Some(sub_matches)) => tick.log(),
@@ -51,6 +52,9 @@ fn main() {
 struct Tick {
     habits_file: PathBuf,
     log_file: PathBuf,
+    habits: Vec<String>,
+    log: HashMap<String, Vec<(String, String)>>,
+    entries: Vec<Entry>,
 }
 
 impl Tick {
@@ -77,7 +81,16 @@ impl Tick {
         Tick {
             habits_file,
             log_file,
+            habits: vec![],
+            log: HashMap::new(),
+            entries: vec![],
         }
+    }
+
+    fn load(&mut self) {
+        self.log = self.get_log();
+        self.habits = self.get_habits();
+        self.entries = self.get_entries();
     }
 
     fn entry(&self, entry: &Entry) {
@@ -102,10 +115,8 @@ impl Tick {
     }
 
     fn log(&self) {
-        let habits = self.get_log();
-
         let to = Local::now();
-        let from = to.checked_sub_signed(chrono::Duration::days(30)).unwrap();
+        let from = to.checked_sub_signed(chrono::Duration::days(20)).unwrap();
 
         print!("{0: >25}: ", "");
         let mut current = from;
@@ -117,12 +128,12 @@ impl Tick {
         }
         println!();
 
-        for habit in habits.keys() {
+        for habit in self.log.keys() {
             print!("{0: >25}: ", &habit);
 
             let mut current = from;
             while current <= to {
-                let mut iter = habits.get(habit).unwrap().iter();
+                let mut iter = self.log.get(habit).unwrap().iter();
 
                 let other_date = format!("{}", current.format("%F"));
                 let entry =
@@ -146,6 +157,9 @@ impl Tick {
             }
             println!();
         }
+
+        let date = format!("{}", to.checked_sub_signed(chrono::Duration::days(1)).unwrap().format("%F"));
+        println!("Yesterday's score: {}%", self.get_score(&date));
     }
 
     fn get_habits(&self) -> Vec<String> {
@@ -165,8 +179,6 @@ impl Tick {
     }
 
     fn ask(&self, ago: i64) {
-        let log = self.get_log();
-
         let entry_date = format!(
             "{}",
             Local::now()
@@ -215,12 +227,11 @@ impl Tick {
     }
 
     fn get_todo(&self, todo_date: &String) -> Vec<String> {
-        let log = self.get_log();
         let mut habits = self.get_habits();
 
         habits.retain(|h| {
-            if log.contains_key(&h.clone()) {
-                let mut iter = log.get(&h.clone()).unwrap().iter();
+            if self.log.contains_key(&h.clone()) {
+                let mut iter = self.log.get(&h.clone()).unwrap().iter();
 
                 if let Some((date, value)) = iter.find(|(date, value)| date == todo_date) {
                     return false;
@@ -259,19 +270,19 @@ impl Tick {
     }
 
     fn get_log(&self) -> HashMap<String, Vec<(String, String)>> {
-        let mut habits = HashMap::new();
+        let mut log = HashMap::new();
 
         for entry in self.get_entries() {
-            if !habits.contains_key(&entry.habit) {
-                habits.insert(entry.habit.clone(), vec![]);
+            if !log.contains_key(&entry.habit) {
+                log.insert(entry.habit.clone(), vec![]);
             }
-            habits
+            log
                 .get_mut(&entry.habit)
                 .unwrap()
                 .push((entry.date, entry.value));
         }
 
-        habits
+        log
     }
 
     fn last_date(&self) -> Option<String> {
@@ -280,12 +291,11 @@ impl Tick {
             .and_then(|entry| Some(entry.date.clone()))
     }
 
-    /*
-    fn habits() ->  {
-        let h = ["a", "b"];
-        h.iter();
+    fn get_score(&self, score_date: &String) -> f32 {
+        let todo = self.get_todo(&score_date);
+
+        100.0 - 100.0 * todo.len() as f32 / self.habits.len() as f32
     }
-    */
 }
 
 struct Entry {
