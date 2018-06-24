@@ -128,26 +128,26 @@ impl Tick {
         }
         println!();
 
-        for habit in self.log.keys() {
-            print!("{0: >25}: ", &habit);
+        for habit in self.habits.iter() {
+            print!("{0: >25}: ", habit);
 
             let mut current = from;
             while current <= to {
                 let mut iter = self.log.get(habit).unwrap().iter();
 
                 let other_date = current.date();
-                let entry =
-                    if let Some((date, value)) = iter.find(|(date, value)| date == &other_date) {
-                        if value == "y" {
+
+                let entry = if let Some(entry) = self.get_entry(&other_date, &habit) {
+                        if entry.value == "y" {
                             "+"
-                        } else if value == "n" {
+                        } else if entry.value == "n" {
                             " "
                         } else {
                             "."
                         }
-                    } else {
+                } else {
                         "?"
-                    };
+                };
 
                 print!("{0: >2} ", &entry);
 
@@ -259,6 +259,12 @@ impl Tick {
         }
 
         entries
+    }
+
+    fn get_entry(&self, date: &Date<Local>, habit: &String) -> Option<&Entry> {
+        self.entries.iter().find(|entry| {
+            entry.date == *date && entry.habit == *habit
+        })
     }
 
     fn get_log(&self) -> HashMap<String, Vec<(Date<Local>, String)>> {
