@@ -53,7 +53,7 @@ struct Tick {
     habits_file: PathBuf,
     log_file: PathBuf,
     habits: Vec<String>,
-    log: HashMap<String, Vec<(String, String)>>,
+    log: HashMap<String, Vec<(Date<Local>, String)>>,
     entries: Vec<Entry>,
 }
 
@@ -110,7 +110,7 @@ impl Tick {
         write!(
             &file,
             "{}\t{}\t{}\n",
-            &entry.date, &entry.habit, &entry.value
+            &entry.date.format("%F"), &entry.habit, &entry.value
         ).unwrap();
     }
 
@@ -135,7 +135,7 @@ impl Tick {
             while current <= to {
                 let mut iter = self.log.get(habit).unwrap().iter();
 
-                let other_date = format!("{}", current.format("%F"));
+                let other_date = current.date();
                 let entry =
                     if let Some((date, value)) = iter.find(|(date, value)| date == &other_date) {
                         if value == "y" {
@@ -158,7 +158,7 @@ impl Tick {
             println!();
         }
 
-        let date = format!("{}", to.checked_sub_signed(chrono::Duration::days(1)).unwrap().format("%F"));
+        let date = to.checked_sub_signed(chrono::Duration::days(1)).unwrap().date();
         println!("Yesterday's score: {}%", self.get_score(&date));
     }
 
@@ -179,13 +179,9 @@ impl Tick {
     }
 
     fn ask(&self, ago: i64) {
-        let entry_date = format!(
-            "{}",
-            Local::now()
+        let entry_date = Local::now()
                 .checked_sub_signed(chrono::Duration::days(ago))
-                .unwrap()
-                .format("%F")
-        );
+                .unwrap().date();
 
         println!("{}:", &entry_date);
 
@@ -213,20 +209,14 @@ impl Tick {
     }
 
     fn todo(&self) {
-        let entry_date = format!(
-            "{}",
-            Local::now()
-                //.checked_sub_signed(chrono::Duration::days(ago))
-                //.unwrap()
-                .format("%F")
-        );
+        let entry_date = Local::now().date();
 
         for habit in self.get_todo(&entry_date) {
             println!("{}", &habit);
         }
     }
 
-    fn get_todo(&self, todo_date: &String) -> Vec<String> {
+    fn get_todo(&self, todo_date: &Date<Local>) -> Vec<String> {
         let mut habits = self.get_habits();
 
         habits.retain(|h| {
@@ -257,8 +247,10 @@ impl Tick {
             let split = l.split("\t");
             let parts: Vec<&str> = split.collect();
 
+            let date_str = format!("{}T00:00:00+00:00", parts[0]);
+
             let entry = Entry {
-                date: parts[0].to_string(),
+                date: DateTime::parse_from_rfc3339(&date_str).unwrap().with_timezone(&Local).date(),
                 habit: parts[1].to_string(),
                 value: parts[2].to_string(),
             };
@@ -269,7 +261,7 @@ impl Tick {
         entries
     }
 
-    fn get_log(&self) -> HashMap<String, Vec<(String, String)>> {
+    fn get_log(&self) -> HashMap<String, Vec<(Date<Local>, String)>> {
         let mut log = HashMap::new();
 
         for entry in self.get_entries() {
@@ -285,13 +277,13 @@ impl Tick {
         log
     }
 
-    fn last_date(&self) -> Option<String> {
+    fn last_date(&self) -> Option<Date<Local>> {
         self.get_entries()
             .last()
             .and_then(|entry| Some(entry.date.clone()))
     }
 
-    fn get_score(&self, score_date: &String) -> f32 {
+    fn get_score(&self, score_date: &Date<Local>) -> f32 {
         let todo = self.get_todo(&score_date);
 
         100.0 - 100.0 * todo.len() as f32 / self.habits.len() as f32
@@ -299,7 +291,7 @@ impl Tick {
 }
 
 struct Entry {
-    date: String,
+    date: Date<Local>,
     habit: String,
     value: String,
 }
