@@ -19,17 +19,28 @@ use std::path::PathBuf;
 
 fn main() {
     let matches = app_from_crate!()
-        .subcommand(SubCommand::with_name("ask").about("Ask for status of all habits for today"))
+        .subcommand(
+            SubCommand::with_name("ask")
+                .about("Ask for status of all habits for a day")
+                .arg(Arg::with_name("days ago").index(1).default_value("0")),
+        )
         .subcommand(SubCommand::with_name("log").about("Print habit log"))
+        .subcommand(SubCommand::with_name("todo").about("Print unresolved tasks for today"))
         .get_matches();
 
     let tick = Tick::new();
 
     match matches.subcommand() {
         ("log", Some(sub_matches)) => tick.log(),
+        ("todo", Some(sub_matches)) => tick.todo(),
+        ("ask", Some(sub_matches)) => {
+            let ago: i64 = sub_matches.value_of("days ago").unwrap().parse().unwrap();
+            tick.ask(ago);
+            tick.log();
+        }
         _ => {
-            // no subcommand used, or "ask"
-            tick.ask();
+            // no subcommand used
+            tick.ask(0);
             tick.log();
         }
     }
@@ -96,7 +107,7 @@ impl Tick {
         let to = Local::now();
         let from = to.checked_sub_signed(chrono::Duration::days(30)).unwrap();
 
-        print!("{0: >20}: ", "");
+        print!("{0: >25}: ", "");
         let mut current = from;
         while current <= to {
             print!("{0:0>2} ", current.day());
@@ -107,7 +118,7 @@ impl Tick {
         println!();
 
         for habit in habits.keys() {
-            print!("{0: >20}: ", &habit);
+            print!("{0: >25}: ", &habit);
 
             let mut current = from;
             while current <= to {
@@ -119,12 +130,12 @@ impl Tick {
                         if value == "y" {
                             "+"
                         } else if value == "n" {
-                            "-"
+                            " "
                         } else {
-                            "?"
+                            "."
                         }
                     } else {
-                        " "
+                        "?"
                     };
 
                 print!("{0: >2} ", &entry);
@@ -137,32 +148,37 @@ impl Tick {
         }
     }
 
-    fn ask(&self) {
+    fn get_habits(&self) -> Vec<String> {
         let f = File::open(&self.habits_file).unwrap();
         let file = BufReader::new(&f);
 
-        let log = self.get_log();
-
-        let entry_date = format!("{}", Local::now().format("%F"));
+        let mut habits = vec![];
 
         for line in file.lines() {
             let habit = line.unwrap();
-
-            if habit.chars().next().unwrap() == '#' {
-                continue;
+            if habit.chars().next().unwrap() != '#' {
+                habits.push(habit);
             }
+        }
 
-            if log.contains_key(&habit) {
-                let mut iter = log.get(&habit).unwrap().iter();
+        habits
+    }
 
-                if let Some((date, value)) = iter.find(|(date, value)| date == &entry_date) {
-                    continue;
-                }
-            }
+    fn ask(&self, ago: i64) {
+        let log = self.get_log();
 
+        let entry_date = format!(
+            "{}",
+            Local::now()
+                .checked_sub_signed(chrono::Duration::days(ago))
+                .unwrap()
+                .format("%F")
+        );
+
+        println!("{}:", &entry_date);
+
+        for habit in self.get_todo(&entry_date) {
             let l = format!("{}? [y/n/-] ", &habit);
-
-            let date = Local::now().format("%F");
 
             let mut value = String::from("");
             loop {
@@ -176,12 +192,44 @@ impl Tick {
 
             if value != "" {
                 self.entry(&Entry {
-                    date: date.to_string(),
+                    date: entry_date.clone(),
                     habit,
                     value,
                 });
             }
         }
+    }
+
+    fn todo(&self) {
+        let entry_date = format!(
+            "{}",
+            Local::now()
+                //.checked_sub_signed(chrono::Duration::days(ago))
+                //.unwrap()
+                .format("%F")
+        );
+
+        for habit in self.get_todo(&entry_date) {
+            println!("{}", &habit);
+        }
+    }
+
+    fn get_todo(&self, todo_date: &String) -> Vec<String> {
+        let log = self.get_log();
+        let mut habits = self.get_habits();
+
+        habits.retain(|h| {
+            if log.contains_key(&h.clone()) {
+                let mut iter = log.get(&h.clone()).unwrap().iter();
+
+                if let Some((date, value)) = iter.find(|(date, value)| date == todo_date) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        habits
     }
 
     fn get_entries(&self) -> Vec<Entry> {
@@ -227,10 +275,9 @@ impl Tick {
     }
 
     fn last_date(&self) -> Option<String> {
-        match self.get_entries().last() {
-            Some(entry) => Some(entry.date.clone()),
-            None => None,
-        }
+        self.get_entries()
+            .last()
+            .and_then(|entry| Some(entry.date.clone()))
     }
 
     /*
