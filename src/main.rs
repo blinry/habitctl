@@ -10,10 +10,8 @@ use std::env;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -32,8 +30,8 @@ fn main() {
     tick.load();
 
     match matches.subcommand() {
-        ("log", Some(sub_matches)) => tick.log(),
-        ("todo", Some(sub_matches)) => tick.todo(),
+        ("log", Some(_)) => tick.log(),
+        ("todo", Some(_)) => tick.todo(),
         ("ask", Some(sub_matches)) => {
             let ago: i64 = sub_matches.value_of("days ago").unwrap().parse().unwrap();
             tick.ask(ago);
@@ -41,7 +39,7 @@ fn main() {
         }
         _ => {
             // no subcommand used
-            tick.ask(0);
+            tick.ask(1);
             tick.log();
         }
     }
@@ -103,14 +101,16 @@ impl Tick {
 
         if let Some(last_date) = last_date {
             if last_date != entry.date {
-                write!(&file, "\n");
+                write!(&file, "\n").unwrap();
             }
         }
 
         write!(
             &file,
             "{}\t{}\t{}\n",
-            &entry.date.format("%F"), &entry.habit, &entry.value
+            &entry.date.format("%F"),
+            &entry.habit,
+            &entry.value
         ).unwrap();
     }
 
@@ -133,20 +133,18 @@ impl Tick {
 
             let mut current = from;
             while current <= to {
-                let mut iter = self.log.get(habit).unwrap().iter();
-
                 let other_date = current.date();
 
                 let entry = if let Some(entry) = self.get_entry(&other_date, &habit) {
-                        if entry.value == "y" {
-                            "+"
-                        } else if entry.value == "n" {
-                            " "
-                        } else {
-                            "."
-                        }
+                    if entry.value == "y" {
+                        "+"
+                    } else if entry.value == "n" {
+                        " "
+                    } else {
+                        "."
+                    }
                 } else {
-                        "?"
+                    "?"
                 };
 
                 print!("{0: >2} ", &entry);
@@ -158,7 +156,10 @@ impl Tick {
             println!();
         }
 
-        let date = to.checked_sub_signed(chrono::Duration::days(1)).unwrap().date();
+        let date = to
+            .checked_sub_signed(chrono::Duration::days(1))
+            .unwrap()
+            .date();
         println!("Yesterday's score: {}%", self.get_score(&date));
     }
 
@@ -179,32 +180,42 @@ impl Tick {
     }
 
     fn ask(&self, ago: i64) {
-        let entry_date = Local::now()
-                .checked_sub_signed(chrono::Duration::days(ago))
-                .unwrap().date();
+        let from = Local::now()
+            .checked_sub_signed(chrono::Duration::days(ago))
+            .unwrap()
+            .date();
 
-        println!("{}:", &entry_date);
+        let now = Local::now().date();
 
-        for habit in self.get_todo(&entry_date) {
-            let l = format!("{}? [y/n/-] ", &habit);
+        let mut current = from;
+        while current <= now {
+            println!("{}:", &current);
 
-            let mut value = String::from("");
-            loop {
-                value = String::from(rprompt::prompt_reply_stdout(&l).unwrap());
-                value = value.trim_right().to_string();
+            for habit in self.get_todo(&current) {
+                let l = format!("{}? [y/n/-] ", &habit);
 
-                if value == "y" || value == "n" || value == "" {
-                    break;
+                let mut value;
+                loop {
+                    value = String::from(rprompt::prompt_reply_stdout(&l).unwrap());
+                    value = value.trim_right().to_string();
+
+                    if value == "y" || value == "n" || value == "" {
+                        break;
+                    }
+                }
+
+                if value != "" {
+                    self.entry(&Entry {
+                        date: current.clone(),
+                        habit,
+                        value,
+                    });
                 }
             }
 
-            if value != "" {
-                self.entry(&Entry {
-                    date: entry_date.clone(),
-                    habit,
-                    value,
-                });
-            }
+            current = current
+                .checked_add_signed(chrono::Duration::days(1))
+                .unwrap();
         }
     }
 
@@ -223,7 +234,7 @@ impl Tick {
             if self.log.contains_key(&h.clone()) {
                 let mut iter = self.log.get(&h.clone()).unwrap().iter();
 
-                if let Some((date, value)) = iter.find(|(date, value)| date == todo_date) {
+                if let Some(_) = iter.find(|(date, _value)| date == todo_date) {
                     return false;
                 }
             }
@@ -250,7 +261,10 @@ impl Tick {
             let date_str = format!("{}T00:00:00+00:00", parts[0]);
 
             let entry = Entry {
-                date: DateTime::parse_from_rfc3339(&date_str).unwrap().with_timezone(&Local).date(),
+                date: DateTime::parse_from_rfc3339(&date_str)
+                    .unwrap()
+                    .with_timezone(&Local)
+                    .date(),
                 habit: parts[1].to_string(),
                 value: parts[2].to_string(),
             };
@@ -262,9 +276,9 @@ impl Tick {
     }
 
     fn get_entry(&self, date: &Date<Local>, habit: &String) -> Option<&Entry> {
-        self.entries.iter().find(|entry| {
-            entry.date == *date && entry.habit == *habit
-        })
+        self.entries
+            .iter()
+            .find(|entry| entry.date == *date && entry.habit == *habit)
     }
 
     fn get_log(&self) -> HashMap<String, Vec<(Date<Local>, String)>> {
@@ -274,8 +288,7 @@ impl Tick {
             if !log.contains_key(&entry.habit) {
                 log.insert(entry.habit.clone(), vec![]);
             }
-            log
-                .get_mut(&entry.habit)
+            log.get_mut(&entry.habit)
                 .unwrap()
                 .push((entry.date, entry.value));
         }
