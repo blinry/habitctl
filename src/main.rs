@@ -50,7 +50,7 @@ fn main() {
 struct Tick {
     habits_file: PathBuf,
     log_file: PathBuf,
-    habits: Vec<String>,
+    habits: Vec<Habit>,
     log: HashMap<String, Vec<(Date<Local>, String)>>,
     entries: Vec<Entry>,
 }
@@ -129,25 +129,11 @@ impl Tick {
         println!();
 
         for habit in self.habits.iter() {
-            print!("{0: >25}: ", habit);
+            print!("{0: >25}: ", habit.name);
 
             let mut current = from;
             while current <= to {
-                let other_date = current.date();
-
-                let entry = if let Some(entry) = self.get_entry(&other_date, &habit) {
-                    if entry.value == "y" {
-                        "+"
-                    } else if entry.value == "n" {
-                        " "
-                    } else {
-                        "."
-                    }
-                } else {
-                    "?"
-                };
-
-                print!("{0: >2} ", &entry);
+                print!("{0: >2} ", &self.symbol(&habit, &current.date()));
 
                 current = current
                     .checked_add_signed(chrono::Duration::days(1))
@@ -163,16 +149,23 @@ impl Tick {
         println!("Yesterday's score: {}%", self.get_score(&date));
     }
 
-    fn get_habits(&self) -> Vec<String> {
+    fn get_habits(&self) -> Vec<Habit> {
         let f = File::open(&self.habits_file).unwrap();
         let file = BufReader::new(&f);
 
         let mut habits = vec![];
 
         for line in file.lines() {
-            let habit = line.unwrap();
-            if habit.chars().next().unwrap() != '#' {
-                habits.push(habit);
+            let l = line.unwrap();
+
+            if l.chars().next().unwrap() != '#' {
+                let split = l.splitn(2, " ");
+                let parts: Vec<&str> = split.collect();
+
+                habits.push(Habit {
+                    every_days: parts[0].parse().unwrap(),
+                    name: String::from(parts[1]),
+                });
             }
         }
 
@@ -192,7 +185,7 @@ impl Tick {
             println!("{}:", &current);
 
             for habit in self.get_todo(&current) {
-                let l = format!("{}? [y/n/-] ", &habit);
+                let l = format!("{}? [y/n/-] ", &habit.name);
 
                 let mut value;
                 loop {
@@ -207,7 +200,7 @@ impl Tick {
                 if value != "" {
                     self.entry(&Entry {
                         date: current.clone(),
-                        habit,
+                        habit: habit.name,
                         value,
                     });
                 }
@@ -223,16 +216,16 @@ impl Tick {
         let entry_date = Local::now().date();
 
         for habit in self.get_todo(&entry_date) {
-            println!("{}", &habit);
+            println!("{}", &habit.name);
         }
     }
 
-    fn get_todo(&self, todo_date: &Date<Local>) -> Vec<String> {
+    fn get_todo(&self, todo_date: &Date<Local>) -> Vec<Habit> {
         let mut habits = self.get_habits();
 
         habits.retain(|h| {
-            if self.log.contains_key(&h.clone()) {
-                let mut iter = self.log.get(&h.clone()).unwrap().iter();
+            if self.log.contains_key(&h.name.clone()) {
+                let mut iter = self.log.get(&h.name.clone()).unwrap().iter();
 
                 if let Some(_) = iter.find(|(date, _value)| date == todo_date) {
                     return false;
@@ -281,6 +274,45 @@ impl Tick {
             .find(|entry| entry.date == *date && entry.habit == *habit)
     }
 
+    fn symbol(&self, habit: &Habit, date: &Date<Local>) -> String {
+        let symbol = if let Some(entry) = self.get_entry(&date, &habit.name) {
+            if entry.value == "y" {
+                "+"
+            } else {
+                if self.habit_satisfied(habit, &date) {
+                    "<"
+                } else {
+                    " "
+                }
+            }
+        } else {
+            "?"
+        };
+        String::from(symbol)
+    }
+
+    fn habit_satisfied(&self, habit: &Habit, date: &Date<Local>) -> bool {
+        if habit.every_days < 1 {
+            return false;
+        }
+
+        let from = date
+            .checked_sub_signed(chrono::Duration::days(habit.every_days - 1))
+            .unwrap();
+        let mut current = from;
+        while current <= *date {
+            if let Some(entry) = self.get_entry(&current, &habit.name) {
+                if entry.value == "y" {
+                    return true;
+                }
+            }
+            current = current
+                .checked_add_signed(chrono::Duration::days(1))
+                .unwrap();
+        }
+        false
+    }
+
     fn get_log(&self) -> HashMap<String, Vec<(Date<Local>, String)>> {
         let mut log = HashMap::new();
 
@@ -303,9 +335,17 @@ impl Tick {
     }
 
     fn get_score(&self, score_date: &Date<Local>) -> f32 {
-        let todo = self.get_todo(&score_date);
+        let mut done: Vec<bool> = self
+            .habits
+            .iter()
+            .map(|habit| {
+                let symbol = self.symbol(&habit, &score_date);
+                symbol.eq("+") || symbol.eq("<")
+            })
+            .collect();
+        done.retain(|value| *value);
 
-        100.0 - 100.0 * todo.len() as f32 / self.habits.len() as f32
+        100.0 * done.len() as f32 / self.habits.len() as f32
     }
 }
 
@@ -313,4 +353,9 @@ struct Entry {
     date: Date<Local>,
     habit: String,
     value: String,
+}
+
+struct Habit {
+    every_days: i64,
+    name: String,
 }
