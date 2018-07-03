@@ -122,12 +122,12 @@ impl Tick {
 
     fn log(&self) {
         let to = Local::now();
-        let from = to.checked_sub_signed(chrono::Duration::days(20)).unwrap();
+        let from = to.checked_sub_signed(chrono::Duration::days(60)).unwrap();
 
-        print!("{0: >25}: ", "");
+        print!("{0: >25} ", "");
         let mut current = from;
         while current <= to {
-            print!("{0:0>2} ", current.day());
+            print!("{0: >1}", self.spark(self.get_score(&current.date())));
             current = current
                 .checked_add_signed(chrono::Duration::days(1))
                 .unwrap();
@@ -135,12 +135,12 @@ impl Tick {
         println!();
 
         for habit in self.habits.iter() {
-            print!("{0: >25}:", habit.name);
+            print!("{0: >25} ", habit.name);
 
             let mut current = from;
             while current <= to {
                 print!(
-                    "{0: >3}",
+                    "{0: >1}",
                     &self.status_to_symbol(&self.day_status(&habit, &current.date()))
                 );
 
@@ -301,10 +301,10 @@ impl Tick {
 
     fn status_to_symbol(&self, status: &DayStatus) -> String {
         let symbol = match status {
-            DayStatus::Unknown => "?",
+            DayStatus::Unknown => "•",
             DayStatus::NotDone => " ",
-            DayStatus::Done => "━━━",
-            DayStatus::Satisfied => "───",
+            DayStatus::Done => "━",
+            DayStatus::Satisfied => "─",
         };
         String::from(symbol)
     }
@@ -353,17 +353,31 @@ impl Tick {
     }
 
     fn get_score(&self, score_date: &Date<Local>) -> f32 {
+        let mut todo: Vec<bool> = self
+            .habits
+            .iter()
+            .map(|habit| habit.every_days > 0)
+            .collect();
+        todo.retain(|value| *value);
+
         let mut done: Vec<bool> = self
             .habits
             .iter()
             .map(|habit| {
                 let status = self.day_status(&habit, &score_date);
-                status == DayStatus::Done || status == DayStatus::Satisfied
+                habit.every_days > 0
+                    && (status == DayStatus::Done || status == DayStatus::Satisfied)
             })
             .collect();
         done.retain(|value| *value);
 
-        100.0 * done.len() as f32 / self.habits.len() as f32
+        100.0 * done.len() as f32 / todo.len() as f32
+    }
+
+    fn spark(&self, score: f32) -> String {
+        let sparks = vec![" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+        let i = (score / sparks.len() as f32) as usize;
+        String::from(sparks[i])
     }
 }
 
