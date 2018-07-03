@@ -22,7 +22,11 @@ fn main() {
                 .about("Ask for status of all habits for a day")
                 .arg(Arg::with_name("days ago").index(1).default_value("1")),
         )
-        .subcommand(SubCommand::with_name("log").about("Print habit log"))
+        .subcommand(
+            SubCommand::with_name("log")
+                .about("Print habit log")
+                .arg(Arg::with_name("filter").index(1).multiple(true)),
+        )
         .subcommand(SubCommand::with_name("todo").about("Print unresolved tasks for today"))
         .get_matches();
 
@@ -30,17 +34,24 @@ fn main() {
     tick.load();
 
     match matches.subcommand() {
-        ("log", Some(_)) => tick.log(),
+        ("log", Some(sub_matches)) => {
+            let filters = if sub_matches.is_present("filter") {
+                sub_matches.values_of("filter").unwrap().collect::<Vec<_>>()
+            } else {
+                vec![]
+            };
+            tick.log(&filters);
+        }
         ("todo", Some(_)) => tick.todo(),
         ("ask", Some(sub_matches)) => {
             let ago: i64 = sub_matches.value_of("days ago").unwrap().parse().unwrap();
             tick.ask(ago);
-            tick.log();
+            tick.log(&vec![]);
         }
         _ => {
             // no subcommand used
             tick.ask(1);
-            tick.log();
+            tick.log(&vec![]);
         }
     }
 }
@@ -120,7 +131,7 @@ impl Tick {
         ).unwrap();
     }
 
-    fn log(&self) {
+    fn log(&self, filters: &Vec<&str>) {
         let to = Local::now();
         let from = to.checked_sub_signed(chrono::Duration::days(60)).unwrap();
 
@@ -135,6 +146,20 @@ impl Tick {
         println!();
 
         for habit in self.habits.iter() {
+            let mut show = false;
+            for filter in filters.iter() {
+                if habit.name.to_lowercase().contains(*filter) {
+                    show = true;
+                }
+            }
+            if filters.len() == 0 {
+                show = true;
+            }
+
+            if !show {
+                continue;
+            }
+
             print!("{0: >25} ", habit.name);
 
             let mut current = from;
