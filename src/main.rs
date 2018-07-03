@@ -20,7 +20,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("ask")
                 .about("Ask for status of all habits for a day")
-                .arg(Arg::with_name("days ago").index(1).default_value("0")),
+                .arg(Arg::with_name("days ago").index(1).default_value("1")),
         )
         .subcommand(SubCommand::with_name("log").about("Print habit log"))
         .subcommand(SubCommand::with_name("todo").about("Print unresolved tasks for today"))
@@ -43,8 +43,6 @@ fn main() {
             tick.log();
         }
     }
-
-    //tick.entry("Geatmet", "true");
 }
 
 struct Tick {
@@ -53,6 +51,14 @@ struct Tick {
     habits: Vec<Habit>,
     log: HashMap<String, Vec<(Date<Local>, String)>>,
     entries: Vec<Entry>,
+}
+
+#[derive(PartialEq)]
+enum DayStatus {
+    Unknown,
+    NotDone,
+    Done,
+    Satisfied,
 }
 
 impl Tick {
@@ -129,11 +135,14 @@ impl Tick {
         println!();
 
         for habit in self.habits.iter() {
-            print!("{0: >25}: ", habit.name);
+            print!("{0: >25}:", habit.name);
 
             let mut current = from;
             while current <= to {
-                print!("{0: >2} ", &self.symbol(&habit, &current.date()));
+                print!(
+                    "{0: >3}",
+                    &self.status_to_symbol(&self.day_status(&habit, &current.date()))
+                );
 
                 current = current
                     .checked_add_signed(chrono::Duration::days(1))
@@ -274,19 +283,28 @@ impl Tick {
             .find(|entry| entry.date == *date && entry.habit == *habit)
     }
 
-    fn symbol(&self, habit: &Habit, date: &Date<Local>) -> String {
-        let symbol = if let Some(entry) = self.get_entry(&date, &habit.name) {
+    fn day_status(&self, habit: &Habit, date: &Date<Local>) -> DayStatus {
+        if let Some(entry) = self.get_entry(&date, &habit.name) {
             if entry.value == "y" {
-                "+"
+                DayStatus::Done
             } else {
                 if self.habit_satisfied(habit, &date) {
-                    "<"
+                    DayStatus::Satisfied
                 } else {
-                    " "
+                    DayStatus::NotDone
                 }
             }
         } else {
-            "?"
+            DayStatus::Unknown
+        }
+    }
+
+    fn status_to_symbol(&self, status: &DayStatus) -> String {
+        let symbol = match status {
+            DayStatus::Unknown => "?",
+            DayStatus::NotDone => " ",
+            DayStatus::Done => "━━━",
+            DayStatus::Satisfied => "───",
         };
         String::from(symbol)
     }
@@ -339,8 +357,8 @@ impl Tick {
             .habits
             .iter()
             .map(|habit| {
-                let symbol = self.symbol(&habit, &score_date);
-                symbol.eq("+") || symbol.eq("<")
+                let status = self.day_status(&habit, &score_date);
+                status == DayStatus::Done || status == DayStatus::Satisfied
             })
             .collect();
         done.retain(|value| *value);
