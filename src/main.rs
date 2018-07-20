@@ -5,6 +5,7 @@ extern crate rprompt;
 
 use chrono::prelude::*;
 use clap::{Arg, SubCommand};
+use std::cmp;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -20,7 +21,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("ask")
                 .about("Ask for status of all habits for a day")
-                .arg(Arg::with_name("days ago").index(1).default_value("1")),
+                .arg(Arg::with_name("days ago").index(1)),
         )
         .subcommand(
             SubCommand::with_name("log")
@@ -34,6 +35,18 @@ fn main() {
     let mut tick = Tick::new();
     tick.load();
 
+    let ago: i64 = if tick.first_date().is_some() {
+        cmp::min(
+            7,
+            Local::now()
+                .date()
+                .signed_duration_since(tick.first_date().unwrap())
+                .num_days(),
+        )
+    } else {
+        1
+    };
+
     match matches.subcommand() {
         ("log", Some(sub_matches)) => {
             let filters = if sub_matches.is_present("filter") {
@@ -45,7 +58,11 @@ fn main() {
         }
         ("todo", Some(_)) => tick.todo(),
         ("ask", Some(sub_matches)) => {
-            let ago: i64 = sub_matches.value_of("days ago").unwrap().parse().unwrap();
+            let ago: i64 = if sub_matches.is_present("days ago") {
+                sub_matches.value_of("days ago").unwrap().parse().unwrap()
+            } else {
+                ago
+            };
             tick.ask(ago);
             tick.log(&vec![]);
         }
@@ -54,7 +71,7 @@ fn main() {
         }
         _ => {
             // no subcommand used
-            tick.ask(1);
+            tick.ask(ago);
             tick.log(&vec![]);
         }
     }
@@ -220,7 +237,9 @@ impl Tick {
 
         let mut current = from;
         while current <= now {
-            println!("{}:", &current);
+            if self.get_todo(&current).len() > 0 {
+                println!("{}:", &current);
+            }
 
             for habit in self.get_todo(&current) {
                 let l = format!("{}? [y/n/-] ", &habit.name);
@@ -375,6 +394,12 @@ impl Tick {
         log
     }
 
+    fn first_date(&self) -> Option<Date<Local>> {
+        self.get_entries()
+            .first()
+            .and_then(|entry| Some(entry.date.clone()))
+    }
+
     fn last_date(&self) -> Option<Date<Local>> {
         self.get_entries()
             .last()
@@ -415,7 +440,7 @@ impl Tick {
 
         for habit1 in self.habits.iter() {
             for habit2 in self.habits.iter() {
-                if (habit1.name == habit2.name) {
+                if habit1.name == habit2.name {
                     continue;
                 }
 
