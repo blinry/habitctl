@@ -181,19 +181,7 @@ impl Tick {
                 continue;
             }
 
-            print!("{0: >25} ", habit.name);
-
-            let mut current = from;
-            while current <= to {
-                print!(
-                    "{0: >1}",
-                    &self.status_to_symbol(&self.day_status(&habit, &current.date()))
-                );
-
-                current = current
-                    .checked_add_signed(chrono::Duration::days(1))
-                    .unwrap();
-            }
+            self.print_habit_row(&habit, from.date(), to.date());
             println!();
         }
 
@@ -202,6 +190,22 @@ impl Tick {
             .unwrap()
             .date();
         println!("Yesterday's score: {}%", self.get_score(&date));
+    }
+
+    fn print_habit_row(&self, habit: &Habit, from: Date<Local>, to: Date<Local>) {
+        print!("{0: >25} ", habit.name);
+
+        let mut current = from;
+        while current <= to {
+            print!(
+                "{0: >1}",
+                &self.status_to_symbol(&self.day_status(&habit, &current))
+            );
+
+            current = current
+                .checked_add_signed(chrono::Duration::days(1))
+                .unwrap();
+        }
     }
 
     fn get_habits(&self) -> Vec<Habit> {
@@ -233,6 +237,9 @@ impl Tick {
             .unwrap()
             .date();
 
+        let to = Local::now();
+        let log_from = to.checked_sub_signed(chrono::Duration::days(60)).unwrap();
+
         let now = Local::now().date();
 
         let mut current = from;
@@ -242,7 +249,8 @@ impl Tick {
             }
 
             for habit in self.get_todo(&current) {
-                let l = format!("{}? [y/n/-] ", &habit.name);
+                self.print_habit_row(&habit, log_from.date(), current.clone());
+                let l = format!("[y/n/-] ");
 
                 let mut value;
                 loop {
@@ -273,7 +281,9 @@ impl Tick {
         let entry_date = Local::now().date();
 
         for habit in self.get_todo(&entry_date) {
-            println!("{}", &habit.name);
+            if habit.every_days > 0 {
+                println!("{}", &habit.name);
+            }
         }
     }
 
