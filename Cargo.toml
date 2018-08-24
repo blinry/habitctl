@@ -1,5 +1,5 @@
 [package]
-name = "tick"
+name = "habitctl"
 version = "0.1.0"
 authors = ["Sebastian Morr <sebastian@morr.cc>"]
 

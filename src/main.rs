@@ -32,15 +32,15 @@ fn main() {
         .subcommand(SubCommand::with_name("correlate").about("Calculate correlations"))
         .get_matches();
 
-    let mut tick = Tick::new();
-    tick.load();
+    let mut habitctl = HabitCtl::new();
+    habitctl.load();
 
-    let ago: i64 = if tick.first_date().is_some() {
+    let ago: i64 = if habitctl.first_date().is_some() {
         cmp::min(
             7,
             Local::now()
                 .date()
-                .signed_duration_since(tick.first_date().unwrap())
+                .signed_duration_since(habitctl.first_date().unwrap())
                 .num_days(),
         )
     } else {
@@ -54,30 +54,30 @@ fn main() {
             } else {
                 vec![]
             };
-            tick.log(&filters);
+            habitctl.log(&filters);
         }
-        ("todo", Some(_)) => tick.todo(),
+        ("todo", Some(_)) => habitctl.todo(),
         ("ask", Some(sub_matches)) => {
             let ago: i64 = if sub_matches.is_present("days ago") {
                 sub_matches.value_of("days ago").unwrap().parse().unwrap()
             } else {
                 ago
             };
-            tick.ask(ago);
-            tick.log(&vec![]);
+            habitctl.ask(ago);
+            habitctl.log(&vec![]);
         }
         ("correlate", Some(sub_matches)) => {
-            tick.correlate();
+            habitctl.correlate();
         }
         _ => {
             // no subcommand used
-            tick.ask(ago);
-            tick.log(&vec![]);
+            habitctl.ask(ago);
+            habitctl.log(&vec![]);
         }
     }
 }
 
-struct Tick {
+struct HabitCtl {
     habits_file: PathBuf,
     log_file: PathBuf,
     habits: Vec<Habit>,
@@ -93,28 +93,28 @@ enum DayStatus {
     Satisfied,
 }
 
-impl Tick {
-    fn new() -> Tick {
-        let mut tick_dir = env::home_dir().unwrap();
-        tick_dir.push(".tick");
-        if !tick_dir.is_dir() {
-            println!("Creating {:?}", tick_dir);
-            fs::create_dir(&tick_dir).unwrap();
+impl HabitCtl {
+    fn new() -> HabitCtl {
+        let mut habitctl_dir = env::home_dir().unwrap();
+        habitctl_dir.push(".habitctl");
+        if !habitctl_dir.is_dir() {
+            println!("Creating {:?}", habitctl_dir);
+            fs::create_dir(&habitctl_dir).unwrap();
         }
 
-        let mut habits_file = tick_dir.clone();
+        let mut habits_file = habitctl_dir.clone();
         habits_file.push("habits");
         if !habits_file.is_file() {
             fs::File::create(&habits_file).unwrap();
         }
 
-        let mut log_file = tick_dir.clone();
+        let mut log_file = habitctl_dir.clone();
         log_file.push("log");
         if !log_file.is_file() {
             fs::File::create(&log_file).unwrap();
         }
 
-        Tick {
+        HabitCtl {
             habits_file,
             log_file,
             habits: vec![],
