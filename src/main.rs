@@ -271,7 +271,7 @@ impl HabitCtl {
         habits
     }
 
-    fn ask(&self, ago: i64) {
+    fn ask(&mut self, ago: i64) {
         let from = Local::now()
             .checked_sub_signed(chrono::Duration::days(ago))
             .unwrap()
@@ -314,6 +314,7 @@ impl HabitCtl {
             current = current
                 .checked_add_signed(chrono::Duration::days(1))
                 .unwrap();
+            self.load();
         }
     }
 
