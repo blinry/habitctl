@@ -42,6 +42,30 @@ Run `h edith` and change the content of the habits file, for example like this:
     0 Had a headache
     1 Used habitctl
 
+Here are some more ideas of what to track:
+
+- got up at a certain time
+- used a space repetition software like Anki
+- took a multivitamin
+- cleared my email inbox
+- answered to all texts
+- visited and read all Slack workspaces
+- practised a language
+- self reflection/used a diary
+- autogenic training
+- published something on my blog/homepage
+- worked on a project
+- did the dishes
+- tidied the apartment
+- closed all browser tabs
+- tracked caloric intake
+- happy
+- flow
+- relaxed
+- coffein intake
+- left my comfort zone
+- thanked someone
+
 Then, simply run `h` regularly, specify whether or not you did the habit, and get pretty graphs!
 
     $ h
