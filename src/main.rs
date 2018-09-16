@@ -154,7 +154,7 @@ impl HabitCtl {
 
     fn log(&self, filters: &Vec<&str>) {
         let to = Local::now();
-        let from = to.checked_sub_signed(chrono::Duration::days(60)).unwrap();
+        let from = to.checked_sub_signed(chrono::Duration::days(100)).unwrap();
 
         print!("{0: >25} ", "");
         let mut current = from;
