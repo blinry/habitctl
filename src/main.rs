@@ -18,6 +18,7 @@ use std::path::PathBuf;
 
 fn main() {
     let matches = app_from_crate!()
+        .template("{bin} {version}\n{author}\n\n{about}\n\nUSAGE:\n    {usage}\n\nFLAGS:\n{flags}\n\nSUBCOMMANDS:\n{subcommands}")
         .subcommand(
             SubCommand::with_name("ask")
                 .about("Ask for status of all habits for a day")

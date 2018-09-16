@@ -2,8 +2,9 @@
 name = "habitctl"
 version = "0.1.0"
 authors = ["Sebastian Morr <sebastian@morr.cc>"]
+description = "Minimalist command line tool you can use to track and examine your habits."
 
 [dependencies]
-chrono = "0.4"
-rprompt = "1.0"
-clap = "2.31.2"
+chrono = "0.4.6"
+rprompt = "1.0.3"
+clap = "2.32.0"
