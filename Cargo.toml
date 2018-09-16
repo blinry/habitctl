@@ -8,3 +8,5 @@ description = "Minimalist command line tool you can use to track and examine you
 chrono = "0.4.6"
 rprompt = "1.0.3"
 clap = "2.32.0"
+open = "1.2.2"
+dirs = "1.0.3"

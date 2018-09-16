@@ -1,6 +1,8 @@
 extern crate chrono;
 #[macro_use]
 extern crate clap;
+extern crate dirs;
+extern crate open;
 extern crate rprompt;
 
 use chrono::prelude::*;
@@ -15,6 +17,8 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process;
+use std::process::Command;
 
 fn main() {
     let matches = app_from_crate!()
@@ -30,6 +34,8 @@ fn main() {
                 .arg(Arg::with_name("filter").index(1).multiple(true)),
         )
         .subcommand(SubCommand::with_name("todo").about("Print unresolved tasks for today"))
+        .subcommand(SubCommand::with_name("edit").about("Edit habit log file"))
+        .subcommand(SubCommand::with_name("edith").about("Edit list of current habits"))
         .get_matches();
 
     let mut habitctl = HabitCtl::new();
@@ -49,6 +55,8 @@ fn main() {
 
     match matches.subcommand() {
         ("log", Some(sub_matches)) => {
+            habitctl.assert_habits();
+            habitctl.assert_entries();
             let filters = if sub_matches.is_present("filter") {
                 sub_matches.values_of("filter").unwrap().collect::<Vec<_>>()
             } else {
@@ -56,8 +64,12 @@ fn main() {
             };
             habitctl.log(&filters);
         }
-        ("todo", Some(_)) => habitctl.todo(),
+        ("todo", Some(_)) => {
+            habitctl.assert_habits();
+            habitctl.todo()
+        }
         ("ask", Some(sub_matches)) => {
+            habitctl.assert_habits();
             let ago: i64 = if sub_matches.is_present("days ago") {
                 sub_matches.value_of("days ago").unwrap().parse().unwrap()
             } else {
@@ -66,8 +78,11 @@ fn main() {
             habitctl.ask(ago);
             habitctl.log(&vec![]);
         }
+        ("edit", Some(_)) => habitctl.edit(),
+        ("edith", Some(_)) => habitctl.edith(),
         _ => {
             // no subcommand used
+            habitctl.assert_habits();
             habitctl.ask(ago);
             habitctl.log(&vec![]);
         }
@@ -92,10 +107,10 @@ enum DayStatus {
 
 impl HabitCtl {
     fn new() -> HabitCtl {
-        let mut habitctl_dir = env::home_dir().unwrap();
+        let mut habitctl_dir = dirs::home_dir().unwrap();
         habitctl_dir.push(".habitctl");
         if !habitctl_dir.is_dir() {
-            println!("Creating {:?}", habitctl_dir);
+            println!("Welcome to habitctl!\n");
             fs::create_dir(&habitctl_dir).unwrap();
         }
 
@@ -103,12 +118,35 @@ impl HabitCtl {
         habits_file.push("habits");
         if !habits_file.is_file() {
             fs::File::create(&habits_file).unwrap();
+            println!(
+                "Created {}. This file will list your currently tracked habits.",
+                habits_file.to_str().unwrap()
+            );
         }
 
         let mut log_file = habitctl_dir.clone();
         log_file.push("log");
         if !log_file.is_file() {
             fs::File::create(&log_file).unwrap();
+
+            let file = OpenOptions::new().append(true).open(&habits_file).unwrap();
+            write!(
+                &file,
+                "# The numbers specifies how often you want to do a habit:\n"
+            );
+            write!(
+                &file,
+                "# 1 means daily, 7 means weekly, 0 means you're just tracking the habit. Some examples:\n"
+            );
+            write!(
+                &file,
+                "\n# 1 Meditated\n# 7 Cleaned the apartment\n# 0 Had a headache\n# 1 Used habitctl\n"
+            );
+
+            println!(
+                "Created {}. This file will contain your habit log.\n",
+                log_file.to_str().unwrap()
+            );
         }
 
         HabitCtl {
@@ -182,11 +220,13 @@ impl HabitCtl {
             println!();
         }
 
-        let date = to
-            .checked_sub_signed(chrono::Duration::days(1))
-            .unwrap()
-            .date();
-        println!("Yesterday's score: {}%", self.get_score(&date));
+        if self.habits.len() > 0 {
+            let date = to
+                .checked_sub_signed(chrono::Duration::days(1))
+                .unwrap()
+                .date();
+            println!("Yesterday's score: {}%", self.get_score(&date));
+        }
     }
 
     fn print_habit_row(&self, habit: &Habit, from: Date<Local>, to: Date<Local>) {
@@ -214,14 +254,17 @@ impl HabitCtl {
         for line in file.lines() {
             let l = line.unwrap();
 
-            if l.chars().next().unwrap() != '#' {
-                let split = l.splitn(2, " ");
-                let parts: Vec<&str> = split.collect();
+            if l.chars().count() > 0 {
+                let first_char = l.chars().next().unwrap();
+                if first_char != '#' && first_char != '\n' {
+                    let split = l.trim().splitn(2, " ");
+                    let parts: Vec<&str> = split.collect();
 
-                habits.push(Habit {
-                    every_days: parts[0].parse().unwrap(),
-                    name: String::from(parts[1]),
-                });
+                    habits.push(Habit {
+                        every_days: parts[0].parse().unwrap(),
+                        name: String::from(parts[1]),
+                    });
+                }
             }
         }
 
@@ -282,6 +325,14 @@ impl HabitCtl {
                 println!("{}", &habit.name);
             }
         }
+    }
+
+    fn edit(&self) {
+        self.open_file(&self.log_file);
+    }
+
+    fn edith(&self) {
+        self.open_file(&self.habits_file);
     }
 
     fn get_todo(&self, todo_date: &Date<Local>) -> Vec<Habit> {
@@ -432,13 +483,43 @@ impl HabitCtl {
             .collect();
         done.retain(|value| *value);
 
-        100.0 * done.len() as f32 / todo.len() as f32
+        if todo.len() > 0 {
+            100.0 * done.len() as f32 / todo.len() as f32
+        } else {
+            0.0
+        }
+    }
+
+    fn assert_habits(&self) {
+        if self.habits.len() == 0 {
+            println!(
+                "You don't have any habits set up!\nRun `habitctl edith` to modify the habit list using your default $EDITOR.");
+            println!("Then, run `habitctl`! Happy tracking!");
+            process::exit(1);
+        }
+    }
+
+    fn assert_entries(&self) {
+        if self.entries.len() == 0 {
+            println!("Please run `habitctl`! Happy tracking!");
+            process::exit(1);
+        }
     }
 
     fn spark(&self, score: f32) -> String {
         let sparks = vec![" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-        let i = (score / sparks.len() as f32) as usize;
+        let i = cmp::min(sparks.len() - 1, (score / sparks.len() as f32) as usize);
         String::from(sparks[i])
+    }
+
+    fn open_file(&self, filename: &PathBuf) {
+        let editor = env::var("EDITOR").unwrap_or(String::from("vi"));
+        Command::new(editor)
+            .arg(filename)
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
     }
 }
 
