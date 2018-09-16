@@ -10,10 +10,10 @@ habitctl is written in the Rust programming language, so you'll need a working [
     $ sh rust.sh
     $ source ~/.cargo/env
 
-Then, compiling Timelens is as easy as this:
+Then, compiling habitctl is as easy as this:
 
-    $ git clone https://github.com/timelens/timelens
-    $ cd timelens
+    $ git clone https://github.com/blinry/habitctl
+    $ cd habitctl
     $ cargo build --release
 
 This will create the binary `target/release/habitctl`, which you can add to your `$PATH`. Additionally, I like to set up an alias called `h`.
