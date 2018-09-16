@@ -30,7 +30,6 @@ fn main() {
                 .arg(Arg::with_name("filter").index(1).multiple(true)),
         )
         .subcommand(SubCommand::with_name("todo").about("Print unresolved tasks for today"))
-        .subcommand(SubCommand::with_name("correlate").about("Calculate correlations"))
         .get_matches();
 
     let mut habitctl = HabitCtl::new();
@@ -66,9 +65,6 @@ fn main() {
             };
             habitctl.ask(ago);
             habitctl.log(&vec![]);
-        }
-        ("correlate", Some(sub_matches)) => {
-            habitctl.correlate();
         }
         _ => {
             // no subcommand used
@@ -443,58 +439,6 @@ impl HabitCtl {
         let sparks = vec![" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
         let i = (score / sparks.len() as f32) as usize;
         String::from(sparks[i])
-    }
-
-    fn correlate(&self) {
-        let to = Local::now();
-        let from = to.checked_sub_signed(chrono::Duration::days(60)).unwrap();
-
-        for habit1 in self.habits.iter() {
-            for habit2 in self.habits.iter() {
-                if habit1.name == habit2.name {
-                    continue;
-                }
-
-                let mut same = 0;
-                let mut different = 0;
-
-                let mut current = from;
-                while current <= to {
-                    let next = current
-                        .checked_add_signed(chrono::Duration::days(1))
-                        .unwrap();
-                    let status1 = self.day_status(&habit1, &current.date());
-                    let status2 = self.day_status(&habit2, &current.date());
-                    if status1 == DayStatus::Done && status2 == DayStatus::Done
-                        || ((status1 == DayStatus::NotDone || status1 == DayStatus::Satisfied)
-                            && (status2 == DayStatus::NotDone || status2 == DayStatus::Satisfied))
-                    {
-                        same += 1;
-                    } else if status1 != DayStatus::Unknown && status2 != DayStatus::Unknown {
-                        different += 1;
-                    }
-                    current = current
-                        .checked_add_signed(chrono::Duration::days(1))
-                        .unwrap();
-                }
-
-                let score = same as f32 / (same + different) as f32;
-                let ratio = same as f32 / different as f32;
-                let reliable = ratio > 0.1 && ratio < 10.0;
-                let significant = score > 0.9 || score < 0.1;
-
-                if significant {
-                    println!(
-                        "{} => {}: {}% ({} same, {} different)",
-                        &habit1.name,
-                        &habit2.name,
-                        (score * 100.0) as usize,
-                        same,
-                        different
-                    );
-                }
-            }
-        }
     }
 }
 
