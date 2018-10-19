@@ -343,7 +343,7 @@ impl HabitCtl {
             if self.log.contains_key(&h.name.clone()) {
                 let mut iter = self.log.get(&h.name.clone()).unwrap().iter();
 
-                if let Some(_) = iter.find(|(date, _value)| date == todo_date) {
+                if let Some(_) = iter.find(|&(date, _value)| date == todo_date) {
                     return false;
                 }
             }
@@ -408,10 +408,10 @@ impl HabitCtl {
 
     fn status_to_symbol(&self, status: &DayStatus) -> String {
         let symbol = match status {
-            DayStatus::Unknown => "•",
-            DayStatus::NotDone => " ",
-            DayStatus::Done => "━",
-            DayStatus::Satisfied => "─",
+            &DayStatus::Unknown => "•",
+            &DayStatus::NotDone => " ",
+            &DayStatus::Done => "━",
+            &DayStatus::Satisfied => "─",
         };
         String::from(symbol)
     }
