@@ -4,6 +4,7 @@ extern crate clap;
 extern crate dirs;
 extern crate open;
 extern crate rprompt;
+extern crate colored;
 
 use chrono::prelude::*;
 use clap::{Arg, SubCommand};
@@ -19,6 +20,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process;
 use std::process::Command;
+use colored::*;
 
 fn main() {
     let matches = app_from_crate!()
@@ -132,15 +134,19 @@ impl HabitCtl {
             let file = OpenOptions::new().append(true).open(&habits_file).unwrap();
             write!(
                 &file,
-                "# The numbers specifies how often you want to do a habit:\n"
+                "# The numbers specifies how often you want to do or not to do the habit:\n"
             );
-            write!(
-                &file,
+            write!(&file,
                 "# 1 means daily, 7 means weekly, 0 means you're just tracking the habit. Some examples:\n"
             );
-            write!(
-                &file,
-                "\n# 1 Meditated\n# 7 Cleaned the apartment\n# 0 Had a headache\n# 1 Used habitctl\n"
+            write!(&file,
+                "# First letter declares if it's a good habit or a bad habit:\n"
+            );
+            write!(&file,
+                "# g means good habit, b means bad habit\n"
+            );
+            write!(&file,
+                "# g 1 Meditated\n# g 7 Cleaned the apartment\n# g 0 Had a headache\n# g 1 Used habitctl\n# b 1 Smoked a cigarette"
             );
 
             println!(
@@ -180,7 +186,8 @@ impl HabitCtl {
 
         write!(
             &file,
-            "{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\n",
+            &entry.habit_type,
             &entry.date.format("%F"),
             &entry.habit,
             &entry.value
@@ -225,12 +232,18 @@ impl HabitCtl {
                 .checked_sub_signed(chrono::Duration::days(1))
                 .unwrap()
                 .date();
+            println!();
             println!("Yesterday's score: {}%", self.get_score(&date));
+            println!();
         }
     }
 
     fn print_habit_row(&self, habit: &Habit, from: Date<Local>, to: Date<Local>) {
-        print!("{0: >25} ", habit.name);
+        if habit.habit_type == "g" {
+            print!("{0: >25} ", habit.name.green());
+        } else {
+            print!("{0: >25} ", habit.name.red());
+        }
 
         let mut current = from;
         while current <= to {
@@ -257,12 +270,26 @@ impl HabitCtl {
             if l.chars().count() > 0 {
                 let first_char = l.chars().next().unwrap();
                 if first_char != '#' && first_char != '\n' {
-                    let split = l.trim().splitn(2, " ");
+                    let split = l.trim().splitn(3, " ");
                     let parts: Vec<&str> = split.collect();
 
+                    let mut habit_type = "g";
+                    let days;
+                    let name;
+
+                    if parts.len() == 2 {
+                        days = parts[0];
+                        name = parts[1];
+                    } else {
+                        habit_type = parts[0];
+                        days = parts[1];
+                        name = parts[2];
+                    }
+
                     habits.push(Habit {
-                        every_days: parts[0].parse().unwrap(),
-                        name: String::from(parts[1]),
+                        habit_type: String::from(habit_type),
+                        every_days: days.parse().unwrap(),
+                        name: String::from(name),
                     });
                 }
             }
@@ -284,11 +311,11 @@ impl HabitCtl {
 
         let mut current = from;
         while current <= now {
-            if self.get_todo(&current).len() > 0 {
+            if self.get_todo(&current, true).len() > 0 {
                 println!("{}:", &current);
             }
 
-            for habit in self.get_todo(&current) {
+            for habit in self.get_todo(&current, true) {
                 self.print_habit_row(&habit, log_from.date(), current.clone());
                 let l = format!("[y/n/-] ");
 
@@ -304,6 +331,7 @@ impl HabitCtl {
 
                 if value != "" {
                     self.entry(&Entry {
+                        habit_type: habit.habit_type,
                         date: current.clone(),
                         habit: habit.name,
                         value,
@@ -321,7 +349,13 @@ impl HabitCtl {
     fn todo(&self) {
         let entry_date = Local::now().date();
 
-        for habit in self.get_todo(&entry_date) {
+        let todos = self.get_todo(&entry_date, false);
+        if todos.len() == 0 {
+            println!("{}", "You have done all good habits for the day, way to go!".green());
+            return
+        }
+
+        for habit in todos {
             if habit.every_days > 0 {
                 println!("{}", &habit.name);
             }
@@ -336,11 +370,15 @@ impl HabitCtl {
         self.open_file(&self.habits_file);
     }
 
-    fn get_todo(&self, todo_date: &Date<Local>) -> Vec<Habit> {
+    fn get_todo(&self, todo_date: &Date<Local>, bad_habits: bool) -> Vec<Habit> {
         let mut habits = self.get_habits();
 
         habits.retain(|h| {
             if self.log.contains_key(&h.name.clone()) {
+                if bad_habits == false && h.habit_type == "b" {
+                    return false;
+                }
+
                 let mut iter = self.log.get(&h.name.clone()).unwrap().iter();
 
                 if let Some(_) = iter.find(|(date, _value)| date == todo_date) {
@@ -367,15 +405,32 @@ impl HabitCtl {
             let split = l.split("\t");
             let parts: Vec<&str> = split.collect();
 
-            let date_str = format!("{}T00:00:00+00:00", parts[0]);
+            let mut habit_type = "g";
+            let mut date;
+            let mut habit;
+            let mut value;
 
+            if parts.len() == 3 {
+                date = &parts[0];
+                habit = &parts[1];
+                value = &parts[2];
+            }
+            else {
+                habit_type = &parts[0];
+                date = &parts[1];
+                habit = &parts[2];
+                value = &parts[3];
+            }
+
+            let date_str = format!("{}T00:00:00+00:00", date);
             let entry = Entry {
+                habit_type: habit_type.to_string(),
                 date: DateTime::parse_from_rfc3339(&date_str)
                     .unwrap()
                     .with_timezone(&Local)
                     .date(),
-                habit: parts[1].to_string(),
-                value: parts[2].to_string(),
+                habit: habit.to_string(),
+                value: value.to_string()
             };
 
             entries.push(entry);
@@ -469,9 +524,17 @@ impl HabitCtl {
         let mut todo: Vec<bool> = self
             .habits
             .iter()
-            .map(|habit| habit.every_days > 0)
+            .map(|habit| { habit.every_days > 0 && habit.habit_type == "g" })
             .collect();
         todo.retain(|value| *value);
+
+        let mut bad: Vec<bool> = self
+            .habits
+            .iter()
+            .map(|habit| { habit.every_days > 0 && habit.habit_type == "b" })
+            .collect();
+
+        bad.retain(|value| *value);
 
         let mut done: Vec<bool> = self
             .habits
@@ -480,15 +543,20 @@ impl HabitCtl {
                 let status = self.day_status(&habit, &score_date);
                 habit.every_days > 0
                     && (status == DayStatus::Done || status == DayStatus::Satisfied)
+                    && habit.habit_type == "g"
             })
             .collect();
         done.retain(|value| *value);
 
-        if todo.len() > 0 {
-            100.0 * done.len() as f32 / todo.len() as f32
-        } else {
-            0.0
+        let mut score = 100.0;
+        if bad.len() > 0 {
+            score = score - (bad.len() as f32 * 10.0)
         }
+
+        if todo.len() > 0 {
+            score = score * (done.len() as f32 / todo.len() as f32)
+        }
+        score
     }
 
     fn assert_habits(&self) {
@@ -525,12 +593,14 @@ impl HabitCtl {
 }
 
 struct Entry {
+    habit_type: String,
     date: Date<Local>,
     habit: String,
     value: String,
 }
 
 struct Habit {
+    habit_type: String,
     every_days: i64,
     name: String,
 }
