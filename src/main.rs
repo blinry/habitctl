@@ -208,7 +208,7 @@ impl HabitCtl {
                     show = true;
                 }
             }
-            if filters.len() == 0 {
+            if filters.is_empty() {
                 show = true;
             }
 
@@ -220,7 +220,7 @@ impl HabitCtl {
             println!();
         }
 
-        if self.habits.len() > 0 {
+        if !self.habits.is_empty() {
             let date = to
                 .checked_sub_signed(chrono::Duration::days(1))
                 .unwrap()
@@ -257,7 +257,7 @@ impl HabitCtl {
             if l.chars().count() > 0 {
                 let first_char = l.chars().next().unwrap();
                 if first_char != '#' && first_char != '\n' {
-                    let split = l.trim().splitn(2, " ");
+                    let split = l.trim().splitn(2, ' ');
                     let parts: Vec<&str> = split.collect();
 
                     habits.push(Habit {
@@ -284,7 +284,7 @@ impl HabitCtl {
 
         let mut current = from;
         while current <= now {
-            if self.get_todo(&current).len() > 0 {
+            if !self.get_todo(&current).is_empty() {
                 println!("{}:", &current);
             }
 
@@ -341,13 +341,12 @@ impl HabitCtl {
 
         habits.retain(|h| {
             if self.log.contains_key(&h.name.clone()) {
-                let mut iter = self.log.get(&h.name.clone()).unwrap().iter();
-
-                if let Some(_) = iter.find(|(date, _value)| date == todo_date) {
+                let mut iter = self.log[&h.name.clone()].iter();
+                if iter.any(|(date, _value)| date == todo_date) {
                     return false;
                 }
             }
-            return true;
+            true
         });
 
         habits
@@ -364,7 +363,7 @@ impl HabitCtl {
             if l == "" {
                 continue;
             }
-            let split = l.split("\t");
+            let split = l.split('\t');
             let parts: Vec<&str> = split.collect();
 
             let date_str = format!("{}T00:00:00+00:00", parts[0]);
@@ -394,12 +393,10 @@ impl HabitCtl {
         if let Some(entry) = self.get_entry(&date, &habit.name) {
             if entry.value == "y" {
                 DayStatus::Done
+            } else if self.habit_satisfied(habit, &date) {
+                DayStatus::Satisfied
             } else {
-                if self.habit_satisfied(habit, &date) {
-                    DayStatus::Satisfied
-                } else {
-                    DayStatus::NotDone
-                }
+                DayStatus::NotDone
             }
         } else {
             DayStatus::Unknown
@@ -484,7 +481,7 @@ impl HabitCtl {
             .collect();
         done.retain(|value| *value);
 
-        if todo.len() > 0 {
+        if !todo.is_empty() {
             100.0 * done.len() as f32 / todo.len() as f32
         } else {
             0.0
@@ -492,7 +489,7 @@ impl HabitCtl {
     }
 
     fn assert_habits(&self) {
-        if self.habits.len() == 0 {
+        if self.habits.is_empty() {
             println!(
                 "You don't have any habits set up!\nRun `habitctl edith` to modify the habit list using your default $EDITOR.");
             println!("Then, run `habitctl`! Happy tracking!");
@@ -501,7 +498,7 @@ impl HabitCtl {
     }
 
     fn assert_entries(&self) {
-        if self.entries.len() == 0 {
+        if self.entries.is_empty() {
             println!("Please run `habitctl`! Happy tracking!");
             process::exit(1);
         }
@@ -514,7 +511,7 @@ impl HabitCtl {
     }
 
     fn open_file(&self, filename: &PathBuf) {
-        let editor = env::var("EDITOR").unwrap_or(String::from("vi"));
+        let editor = env::var("EDITOR").unwrap_or_else(|_| String::from("vi"));
         Command::new(editor)
             .arg(filename)
             .spawn()
