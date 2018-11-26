@@ -4,7 +4,7 @@
 
 ## Installation
 
-habitctl is written in the Rust programming language, so you'll need a working [Rust installation](https://www.rust-lang.org). You'll probably want to run these commands:
+habitctl is written in the Rust programming language, so you'll need a working, up-to-date [Rust installation](https://www.rust-lang.org). You'll probably want to run these commands:
 
     $ curl -f https://sh.rustup.rs > rust.sh
     $ sh rust.sh
