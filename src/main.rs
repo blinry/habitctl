@@ -4,6 +4,7 @@ extern crate clap;
 extern crate dirs;
 extern crate open;
 extern crate rprompt;
+extern crate math;
 
 use chrono::prelude::*;
 use clap::{Arg, SubCommand};
@@ -19,6 +20,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process;
 use std::process::Command;
+use math::round;
 
 fn main() {
     let matches = app_from_crate!()
@@ -482,7 +484,7 @@ impl HabitCtl {
         done.retain(|value| *value);
 
         if !todo.is_empty() {
-            100.0 * done.len() as f32 / todo.len() as f32
+            round::ceil((100.0 * done.len() as f32 / todo.len() as f32).into(), 1) as f32
         } else {
             0.0
         }
