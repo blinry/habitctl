@@ -105,6 +105,8 @@ enum DayStatus {
     NotDone,
     Done,
     Satisfied,
+    Skipped,
+    Skipified,
 }
 
 impl HabitCtl {
@@ -292,14 +294,14 @@ impl HabitCtl {
 
             for habit in self.get_todo(&current) {
                 self.print_habit_row(&habit, log_from.date(), current.clone());
-                let l = format!("[y/n/-] ");
+                let l = format!("[y/n/s/⏎] ");
 
                 let mut value;
                 loop {
                     value = String::from(rprompt::prompt_reply_stdout(&l).unwrap());
                     value = value.trim_right().to_string();
 
-                    if value == "y" || value == "n" || value == "" {
+                    if value == "y" || value == "n" || value == "s" || value == "" {
                         break;
                     }
                 }
@@ -395,8 +397,12 @@ impl HabitCtl {
         if let Some(entry) = self.get_entry(&date, &habit.name) {
             if entry.value == "y" {
                 DayStatus::Done
+            } else if entry.value == "s" {
+                DayStatus::Skipped
             } else if self.habit_satisfied(habit, &date) {
                 DayStatus::Satisfied
+            } else if self.habit_skipified(habit, &date) {
+                DayStatus::Skipified
             } else {
                 DayStatus::NotDone
             }
@@ -407,10 +413,12 @@ impl HabitCtl {
 
     fn status_to_symbol(&self, status: &DayStatus) -> String {
         let symbol = match status {
-            DayStatus::Unknown => "•",
+            DayStatus::Unknown => "?",
             DayStatus::NotDone => " ",
             DayStatus::Done => "━",
             DayStatus::Satisfied => "─",
+            DayStatus::Skipped => "•",
+            DayStatus::Skipified => "·"
         };
         String::from(symbol)
     }
@@ -427,6 +435,28 @@ impl HabitCtl {
         while current <= *date {
             if let Some(entry) = self.get_entry(&current, &habit.name) {
                 if entry.value == "y" {
+                    return true;
+                }
+            }
+            current = current
+                .checked_add_signed(chrono::Duration::days(1))
+                .unwrap();
+        }
+        false
+    }
+
+        fn habit_skipified(&self, habit: &Habit, date: &Date<Local>) -> bool {
+        if habit.every_days < 1 {
+            return false;
+        }
+
+        let from = date
+            .checked_sub_signed(chrono::Duration::days(habit.every_days - 1))
+            .unwrap();
+        let mut current = from;
+        while current <= *date {
+            if let Some(entry) = self.get_entry(&current, &habit.name) {
+                if entry.value == "s" {
                     return true;
                 }
             }
@@ -483,8 +513,19 @@ impl HabitCtl {
             .collect();
         done.retain(|value| *value);
 
+        let mut skip: Vec<bool> = self
+            .habits
+            .iter()
+            .map(|habit| {
+                let status = self.day_status(&habit, &score_date);
+                habit.every_days > 0
+                    && (status == DayStatus::Skipped || status == DayStatus::Skipified)
+            })
+            .collect();
+        skip.retain(|value| *value);
+
         if !todo.is_empty() {
-            round::ceil((100.0 * done.len() as f32 / todo.len() as f32).into(), 1) as f32
+            round::ceil((100.0 * done.len() as f32 / (todo.len() - skip.len()) as f32).into(), 1) as f32
         } else {
             0.0
         }
