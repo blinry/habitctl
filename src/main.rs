@@ -107,6 +107,7 @@ enum DayStatus {
     Satisfied,
     Skipped,
     Skipified,
+    Warning,
 }
 
 impl HabitCtl {
@@ -407,7 +408,11 @@ impl HabitCtl {
                 DayStatus::NotDone
             }
         } else {
+            if self.habit_warning(habit, &date) {
+                DayStatus::Warning
+            } else {
             DayStatus::Unknown
+            }
         }
     }
 
@@ -418,7 +423,8 @@ impl HabitCtl {
             DayStatus::Done => "━",
             DayStatus::Satisfied => "─",
             DayStatus::Skipped => "•",
-            DayStatus::Skipified => "·"
+            DayStatus::Skipified => "·",
+            DayStatus::Warning => "!"
         };
         String::from(symbol)
     }
@@ -462,6 +468,30 @@ impl HabitCtl {
             }
             current = current
                 .checked_add_signed(chrono::Duration::days(1))
+                .unwrap();
+        }
+        false
+    }
+
+        fn habit_warning(&self, habit: &Habit, date: &Date<Local>) -> bool {
+        if habit.every_days < 1 {
+            return false;
+        }
+
+        let from = date
+            .checked_sub_signed(chrono::Duration::days(habit.every_days))
+            .unwrap();
+        let mut current = *date;
+        while current >= from {
+            if let Some(entry) = self.get_entry(&current, &habit.name) {
+                if (entry.value == "y" || entry.value == "s") && current - from > chrono::Duration::days(0) {
+                        return false;
+                } else if (entry.value == "y" || entry.value == "s") && current - from == chrono::Duration::days(0) {
+                    return true;
+                }
+            }
+            current = current
+                .checked_sub_signed(chrono::Duration::days(1))
                 .unwrap();
         }
         false
