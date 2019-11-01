@@ -96,7 +96,7 @@ Then, simply run `h` regularly, specify whether or not you did the habit (or nee
 
 The score specifies how many of the due habits you did that day and removes any you may have skipped from the calculation. The sparkline at the top give a graphical representation of the score. The thick lines in the graph say that you did the habit, the thin lines say that that it was okay that you didn't to it. A thick dot implies you had to skip or were unable to exercise a habit for whatever good reason, and a thin dot indicates the period for which a skip would normally be in effect (in the example above, we are suggesting you could not clean your apartment because you were on a business trip when you'd normally clean it and can thus excuse yourself.).
 
-Also, on the day, if a habit chain is in danger of breaking because it's the last day you can do it before the consistency graph would have a gap in it, habitctl will give you a warning by turning the "?" symbol you'd see on the day into an "!".
+Also, on the day, if a habit chain is in danger of breaking because it's the last day you can do it before the consistency graph would have a gap in it, habitctl will give you a warning by turning the " " symbol you'd see on the day into an "!".
 
 Enter `h help` if you're lost:
 
