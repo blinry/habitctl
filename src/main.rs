@@ -418,7 +418,7 @@ impl HabitCtl {
 
     fn status_to_symbol(&self, status: &DayStatus) -> String {
         let symbol = match status {
-            DayStatus::Unknown => "?",
+            DayStatus::Unknown => " ",
             DayStatus::NotDone => " ",
             DayStatus::Done => "━",
             DayStatus::Satisfied => "─",
