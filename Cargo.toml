@@ -1,13 +1,22 @@
 [package]
 name = "habitctl"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Sebastian Morr <sebastian@morr.cc>", "Daryl Manning <daryl@wakatara.com>"]
 description = "Minimalist command line tool you can use to track and examine your habits."
 
 [dependencies]
+<<<<<<< HEAD
 chrono = "0.4.6"
 rprompt = "1.0.3"
 clap = "2.32.0"
 open = "1.2.2"
 dirs = "1.0.3"
 libmath = "0.1.4"
+=======
+chrono = "0.4.10"
+rprompt = "1.0.5"
+clap = "2.33.0"
+open = "1.3.2"
+dirs = "2.0.2"
+libmath = "0.2.1"
+>>>>>>> 56ada50... Upgraded crates to current for rprompt, clap, open, dirs, and libmath.
