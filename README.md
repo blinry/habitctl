@@ -45,12 +45,12 @@ Run `h edith` and change the content of the habits file, for example like this:
 Here are some more ideas of what to track:
 
 - got up at a certain time
-- used a space repetition software like Anki
+- used a spaced repetition software like Anki
 - took a multivitamin
 - cleared my email inbox
 - answered to all texts
 - visited and read all Slack workspaces
-- practised a language
+- practiced a language
 - self reflection/used a diary
 - autogenic training
 - published something on my blog/homepage
@@ -62,23 +62,23 @@ Here are some more ideas of what to track:
 - happy
 - flow
 - relaxed
-- coffein intake
+- coffee intake
 - left my comfort zone
 - thanked someone
 
-Then, simply run `h` regularly, specify whether or not you did the habit, and get pretty graphs!
+Then, simply run `h` regularly, specify whether or not you did the habit (or needed to skip the habit for some reason - eg. could not clean apartment because you were away for week), and get pretty graphs!
 
     $ h
     2018-09-15+02:00:
-                    Meditated ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••[y/n/-] y
-        Cleaned the apartment ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••[y/n/-] y
-               Had a headache ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••[y/n/-] n
-                Used habitctl ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••[y/n/-] y
+                    Meditated ━       ━ ━  ━━         ━    ━   ━ ━   ━━━━━━━━━━━   ━ ━   ━[y/n/s/⏎] y
+        Cleaned the apartment ━──────                 ━──────           ━──────    •······[y/n/s/⏎] n
+               Had a headache             ━  ━     ━━                  ━━   ━   ━━        [y/n/s/⏎] n
+                Used habitctl    ━ ━━━ ━  ━━━   ━ ━ ━       ━ ━ ━  ━ ━ ━━ ━ ━ ━━━━   ━    [y/n/s/⏎] y
     2018-09-16+02:00:
-                    Meditated •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••━•[y/n/-] y
-        Cleaned the apartment •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••━•[y/n/-] n
-               Had a headache ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••• •[y/n/-] n
-                Used habitctl •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••━•[y/n/-] y
+                    Meditated        ━ ━  ━━         ━    ━   ━ ━   ━━━━━━━━━━━   ━ ━   ━ [y/n/s/⏎] y
+        Cleaned the apartment ──────                 ━──────           ━──────    •······ [y/n/s/⏎] n
+               Had a headache            ━  ━     ━━                  ━━   ━   ━━         [y/n/s/⏎] n
+                Used habitctl   ━ ━━━ ━  ━━━   ━ ━ ━       ━ ━ ━  ━ ━ ━━ ━ ━ ━━━━   ━    ━[y/n/s/⏎] y
 
 
 (Some weeks later)
@@ -86,15 +86,15 @@ Then, simply run `h` regularly, specify whether or not you did the habit, and ge
     $ h log
                               ▄▃▃▄▄▃▄▆▆▆▅▆▆▇▆▄▃▄▆▃▆▃▆▂▅▄▃▄▅▆▅▃▃▃▆▂▄▅▄▅▅▅▆▄▄▆▇▆▅▅▄▃▅▆▄▆▃▃▂▅▆
                     Meditated ━       ━ ━  ━━         ━    ━   ━ ━   ━━━━━━━━━━━   ━ ━   ━━
-        Cleaned the apartment ━──────                 ━──────           ━──────            
+        Cleaned the apartment ━──────                 ━──────           ━──────    •······        
                Had a headache             ━  ━     ━━                  ━━   ━   ━━         
                 Used habitctl    ━ ━━━ ━  ━━━   ━ ━ ━       ━ ━ ━  ━ ━ ━━ ━ ━ ━━━━   ━    ━
 
                                              ... some habits omitted ...
 
-    Yesterday's score: 73%
+    Yesterday's score: 73.3%
 
-The score specifies how many of the due habits you did that day. The sparkline at the top give a graphical representation of the score. The thick lines in the graph say that you did the habit, the thin lines say that that it was okay that you didn't to it.
+The score specifies how many of the due habits you did that day and removes any you may have skipped from the calculation. The sparkline at the top give a graphical representation of the score. The thick lines in the graph say that you did the habit, the thin lines say that that it was okay that you didn't to it. A thick dot implies you had to skip or were unable to exercise a habit for whatever good reason, and a thin dot indicates the period for which a skip would normally be in effect (in the example above, we are suggesting you could not clean your apartment because you were on a business trip when you'd normally clean it and can thus excuse yourself.).
 
 Enter `h help` if you're lost:
 
