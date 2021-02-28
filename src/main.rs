@@ -46,8 +46,7 @@ fn main() {
     let ago: i64 = if habitctl.first_date().is_some() {
         cmp::min(
             7,
-            Local::now()
-                .date()
+            Local::today().naive_local()
                 .signed_duration_since(habitctl.first_date().unwrap())
                 .num_days(),
         )
@@ -95,7 +94,7 @@ struct HabitCtl {
     habits_file: PathBuf,
     log_file: PathBuf,
     habits: Vec<Habit>,
-    log: HashMap<String, Vec<(Date<Local>, String)>>,
+    log: HashMap<String, Vec<(NaiveDate, String)>>,
     entries: Vec<Entry>,
 }
 
@@ -193,13 +192,13 @@ impl HabitCtl {
     }
 
     fn log(&self, filters: &Vec<&str>) {
-        let to = Local::now();
+        let to = Local::today().naive_local();
         let from = to.checked_sub_signed(chrono::Duration::days(100)).unwrap();
 
         print!("{0: >25} ", "");
         let mut current = from;
         while current <= to {
-            print!("{0: >1}", self.spark(self.get_score(&current.date())));
+            print!("{0: >1}", self.spark(self.get_score(&current)));
             current = current
                 .checked_add_signed(chrono::Duration::days(1))
                 .unwrap();
@@ -221,20 +220,19 @@ impl HabitCtl {
                 continue;
             }
 
-            self.print_habit_row(&habit, from.date(), to.date());
+            self.print_habit_row(&habit, from, to);
             println!();
         }
 
         if !self.habits.is_empty() {
             let date = to
                 .checked_sub_signed(chrono::Duration::days(1))
-                .unwrap()
-                .date();
+                .unwrap();
             println!("Yesterday's score: {}%", self.get_score(&date));
         }
     }
 
-    fn print_habit_row(&self, habit: &Habit, from: Date<Local>, to: Date<Local>) {
+    fn print_habit_row(&self, habit: &Habit, from: NaiveDate, to: NaiveDate) {
         print!("{0: >25} ", habit.name);
 
         let mut current = from;
@@ -277,15 +275,14 @@ impl HabitCtl {
     }
 
     fn ask(&mut self, ago: i64) {
-        let from = Local::now()
+        let from = Local::today().naive_local()
             .checked_sub_signed(chrono::Duration::days(ago))
-            .unwrap()
-            .date();
+            .unwrap();
 
-        let to = Local::now();
+        let to = Local::today().naive_local();
         let log_from = to.checked_sub_signed(chrono::Duration::days(60)).unwrap();
 
-        let now = Local::now().date();
+        let now = Local::today().naive_local();
 
         let mut current = from;
         while current <= now {
@@ -294,13 +291,13 @@ impl HabitCtl {
             }
 
             for habit in self.get_todo(&current) {
-                self.print_habit_row(&habit, log_from.date(), current.clone());
+                self.print_habit_row(&habit, log_from, current.clone());
                 let l = format!("[y/n/s/⏎] ");
 
                 let mut value;
                 loop {
                     value = String::from(rprompt::prompt_reply_stdout(&l).unwrap());
-                    value = value.trim_right().to_string();
+                    value = value.trim_end().to_string();
 
                     if value == "y" || value == "n" || value == "s" || value == "" {
                         break;
@@ -324,7 +321,7 @@ impl HabitCtl {
     }
 
     fn todo(&self) {
-        let entry_date = Local::now().date();
+        let entry_date = Local::today().naive_local();
 
         for habit in self.get_todo(&entry_date) {
             if habit.every_days > 0 {
@@ -341,7 +338,7 @@ impl HabitCtl {
         self.open_file(&self.habits_file);
     }
 
-    fn get_todo(&self, todo_date: &Date<Local>) -> Vec<Habit> {
+    fn get_todo(&self, todo_date: &NaiveDate) -> Vec<Habit> {
         let mut habits = self.get_habits();
 
         habits.retain(|h| {
@@ -371,13 +368,9 @@ impl HabitCtl {
             let split = l.split('\t');
             let parts: Vec<&str> = split.collect();
 
-            let date_str = format!("{}T00:00:00+00:00", parts[0]);
-
             let entry = Entry {
-                date: DateTime::parse_from_rfc3339(&date_str)
-                    .unwrap()
-                    .with_timezone(&Local)
-                    .date(),
+                date: NaiveDate::parse_from_str(parts[0], "%Y-%m-%d")
+                    .unwrap(),
                 habit: parts[1].to_string(),
                 value: parts[2].to_string(),
             };
@@ -388,13 +381,13 @@ impl HabitCtl {
         entries
     }
 
-    fn get_entry(&self, date: &Date<Local>, habit: &String) -> Option<&Entry> {
+    fn get_entry(&self, date: &NaiveDate, habit: &String) -> Option<&Entry> {
         self.entries
             .iter()
             .find(|entry| entry.date == *date && entry.habit == *habit)
     }
 
-    fn day_status(&self, habit: &Habit, date: &Date<Local>) -> DayStatus {
+    fn day_status(&self, habit: &Habit, date: &NaiveDate) -> DayStatus {
         if let Some(entry) = self.get_entry(&date, &habit.name) {
             if entry.value == "y" {
                 DayStatus::Done
@@ -418,7 +411,7 @@ impl HabitCtl {
 
     fn status_to_symbol(&self, status: &DayStatus) -> String {
         let symbol = match status {
-            DayStatus::Unknown => "?",
+            DayStatus::Unknown => " ",
             DayStatus::NotDone => " ",
             DayStatus::Done => "━",
             DayStatus::Satisfied => "─",
@@ -429,7 +422,7 @@ impl HabitCtl {
         String::from(symbol)
     }
 
-    fn habit_satisfied(&self, habit: &Habit, date: &Date<Local>) -> bool {
+    fn habit_satisfied(&self, habit: &Habit, date: &NaiveDate) -> bool {
         if habit.every_days < 1 {
             return false;
         }
@@ -451,7 +444,7 @@ impl HabitCtl {
         false
     }
 
-        fn habit_skipified(&self, habit: &Habit, date: &Date<Local>) -> bool {
+        fn habit_skipified(&self, habit: &Habit, date: &NaiveDate) -> bool {
         if habit.every_days < 1 {
             return false;
         }
@@ -473,7 +466,7 @@ impl HabitCtl {
         false
     }
 
-        fn habit_warning(&self, habit: &Habit, date: &Date<Local>) -> bool {
+        fn habit_warning(&self, habit: &Habit, date: &NaiveDate) -> bool {
         if habit.every_days < 1 {
             return false;
         }
@@ -497,7 +490,7 @@ impl HabitCtl {
         false
     }
 
-    fn get_log(&self) -> HashMap<String, Vec<(Date<Local>, String)>> {
+    fn get_log(&self) -> HashMap<String, Vec<(NaiveDate, String)>> {
         let mut log = HashMap::new();
 
         for entry in self.get_entries() {
@@ -512,19 +505,19 @@ impl HabitCtl {
         log
     }
 
-    fn first_date(&self) -> Option<Date<Local>> {
+    fn first_date(&self) -> Option<NaiveDate> {
         self.get_entries()
             .first()
             .and_then(|entry| Some(entry.date.clone()))
     }
 
-    fn last_date(&self) -> Option<Date<Local>> {
+    fn last_date(&self) -> Option<NaiveDate> {
         self.get_entries()
             .last()
             .and_then(|entry| Some(entry.date.clone()))
     }
 
-    fn get_score(&self, score_date: &Date<Local>) -> f32 {
+    fn get_score(&self, score_date: &NaiveDate) -> f32 {
         let mut todo: Vec<bool> = self
             .habits
             .iter()
@@ -595,7 +588,7 @@ impl HabitCtl {
 }
 
 struct Entry {
-    date: Date<Local>,
+    date: NaiveDate,
     habit: String,
     value: String,
 }
