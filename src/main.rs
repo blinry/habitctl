@@ -13,7 +13,7 @@ use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::process::Command;
 
@@ -42,6 +42,7 @@ fn ask_prompt() -> String {
 fn main() {
     let matches = app_from_crate!()
         .template("{bin} {version}\n{author}\n\n{about}\n\nUSAGE:\n    {usage}\n\nFLAGS:\n{flags}\n\nSUBCOMMANDS:\n{subcommands}")
+        .arg(Arg::with_name("habit-dir").long("habit-dir").default_value("~/.habitctl/"))
         .subcommand(
             SubCommand::with_name("ask")
                 .about("Ask for status of all habits for a day")
@@ -57,7 +58,10 @@ fn main() {
         .subcommand(SubCommand::with_name("edith").about("Edit list of current habits"))
         .get_matches();
 
-    let mut habitctl = HabitCtl::new();
+    let expanded = shellexpand::tilde(matches.value_of("habit-dir").unwrap());
+    let habitctl_dir = Path::new(expanded.as_ref());
+
+    let mut habitctl = HabitCtl::new(&habitctl_dir);
     habitctl.load();
 
     let ago: i64 = if habitctl.first_date().is_some() {
@@ -128,18 +132,16 @@ enum DayStatus {
 }
 
 impl HabitCtl {
-    fn new() -> HabitCtl {
-        let mut habitctl_dir = dirs::home_dir().unwrap();
-        habitctl_dir.push(".habitctl");
+    fn new(habitctl_dir: &Path) -> HabitCtl {
         if !habitctl_dir.is_dir() {
             println!("Welcome to habitctl!\n");
             fs::create_dir(&habitctl_dir).unwrap();
         }
 
-        let mut habits_file = habitctl_dir.clone();
+        let mut habits_file = habitctl_dir.to_owned();
         habits_file.push("habits");
         if !habits_file.is_file() {
-            fs::File::create(&habits_file).unwrap();
+            fs::write(&habits_file, HABIT_FILE_TEMPLATE).unwrap();
 
             println!(
                 "Created {}. This file will list your currently tracked habits.",
@@ -147,10 +149,10 @@ impl HabitCtl {
             );
         }
 
-        let mut log_file = habitctl_dir;
+        let mut log_file = habitctl_dir.to_owned();
         log_file.push("log");
         if !log_file.is_file() {
-            fs::write(&log_file, HABIT_FILE_TEMPLATE).unwrap();
+            fs::write(&log_file, "").unwrap();
 
             println!(
                 "Created {}. This file will contain your habit log.\n",
