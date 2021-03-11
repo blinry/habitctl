@@ -4,6 +4,8 @@ version = "0.3.2"
 authors = ["Sebastian Morr <sebastian@morr.cc>", "Daryl Manning <daryl@wakatara.com>"]
 description = "Minimalist command line tool you can use to track and examine your habits."
 
+edition = "2018"
+
 [dependencies]
 chrono = "0.4.10"
 rprompt = "1.0.5"

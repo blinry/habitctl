@@ -1,10 +1,7 @@
-extern crate chrono;
+use chrono;
 #[macro_use]
 extern crate clap;
-extern crate dirs;
-extern crate open;
-extern crate rprompt;
-extern crate math;
+
 
 use chrono::prelude::*;
 use clap::{Arg, SubCommand};
