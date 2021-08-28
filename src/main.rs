@@ -2,12 +2,13 @@ extern crate chrono;
 #[macro_use]
 extern crate clap;
 extern crate dirs;
+extern crate math;
 extern crate open;
 extern crate rprompt;
-extern crate math;
 
 use chrono::prelude::*;
 use clap::{Arg, SubCommand};
+use math::round;
 use std::cmp;
 use std::collections::HashMap;
 use std::env;
@@ -20,7 +21,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process;
 use std::process::Command;
-use math::round;
 
 fn main() {
     let matches = app_from_crate!()
@@ -46,7 +46,8 @@ fn main() {
     let ago: i64 = if habitctl.first_date().is_some() {
         cmp::min(
             7,
-            Local::today().naive_local()
+            Local::today()
+                .naive_local()
                 .signed_duration_since(habitctl.first_date().unwrap())
                 .num_days(),
         )
@@ -188,7 +189,8 @@ impl HabitCtl {
             &entry.date.format("%F"),
             &entry.habit,
             &entry.value
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     fn log(&self, filters: &Vec<&str>) {
@@ -225,9 +227,7 @@ impl HabitCtl {
         }
 
         if !self.habits.is_empty() {
-            let date = to
-                .checked_sub_signed(chrono::Duration::days(1))
-                .unwrap();
+            let date = to.checked_sub_signed(chrono::Duration::days(1)).unwrap();
             println!("Yesterday's score: {}%", self.get_score(&date));
         }
     }
@@ -275,7 +275,8 @@ impl HabitCtl {
     }
 
     fn ask(&mut self, ago: i64) {
-        let from = Local::today().naive_local()
+        let from = Local::today()
+            .naive_local()
             .checked_sub_signed(chrono::Duration::days(ago))
             .unwrap();
 
@@ -369,8 +370,7 @@ impl HabitCtl {
             let parts: Vec<&str> = split.collect();
 
             let entry = Entry {
-                date: NaiveDate::parse_from_str(parts[0], "%Y-%m-%d")
-                    .unwrap(),
+                date: NaiveDate::parse_from_str(parts[0], "%Y-%m-%d").unwrap(),
                 habit: parts[1].to_string(),
                 value: parts[2].to_string(),
             };
@@ -404,7 +404,7 @@ impl HabitCtl {
             if self.habit_warning(habit, &date) {
                 DayStatus::Warning
             } else {
-            DayStatus::Unknown
+                DayStatus::Unknown
             }
         }
     }
@@ -417,7 +417,7 @@ impl HabitCtl {
             DayStatus::Satisfied => "─",
             DayStatus::Skipped => "•",
             DayStatus::Skipified => "·",
-            DayStatus::Warning => "!"
+            DayStatus::Warning => "!",
         };
         String::from(symbol)
     }
@@ -444,7 +444,7 @@ impl HabitCtl {
         false
     }
 
-        fn habit_skipified(&self, habit: &Habit, date: &NaiveDate) -> bool {
+    fn habit_skipified(&self, habit: &Habit, date: &NaiveDate) -> bool {
         if habit.every_days < 1 {
             return false;
         }
@@ -466,7 +466,7 @@ impl HabitCtl {
         false
     }
 
-        fn habit_warning(&self, habit: &Habit, date: &NaiveDate) -> bool {
+    fn habit_warning(&self, habit: &Habit, date: &NaiveDate) -> bool {
         if habit.every_days < 1 {
             return false;
         }
@@ -477,9 +477,13 @@ impl HabitCtl {
         let mut current = *date;
         while current >= from {
             if let Some(entry) = self.get_entry(&current, &habit.name) {
-                if (entry.value == "y" || entry.value == "s") && current - from > chrono::Duration::days(0) {
-                        return false;
-                } else if (entry.value == "y" || entry.value == "s") && current - from == chrono::Duration::days(0) {
+                if (entry.value == "y" || entry.value == "s")
+                    && current - from > chrono::Duration::days(0)
+                {
+                    return false;
+                } else if (entry.value == "y" || entry.value == "s")
+                    && current - from == chrono::Duration::days(0)
+                {
                     return true;
                 }
             }
@@ -548,7 +552,10 @@ impl HabitCtl {
         skip.retain(|value| *value);
 
         if !todo.is_empty() {
-            round::ceil((100.0 * done.len() as f32 / (todo.len() - skip.len()) as f32).into(), 1) as f32
+            round::ceil(
+                (100.0 * done.len() as f32 / (todo.len() - skip.len()) as f32).into(),
+                1,
+            ) as f32
         } else {
             0.0
         }
