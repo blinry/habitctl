@@ -18,6 +18,7 @@ use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::process::Command;
@@ -78,7 +79,7 @@ fn main() {
                 ago
             };
             habitctl.ask(ago);
-            habitctl.log(&vec![]);
+            habitctl.log(&[]);
         }
         ("edit", Some(_)) => habitctl.edit(),
         ("edith", Some(_)) => habitctl.edith(),
@@ -86,7 +87,7 @@ fn main() {
             // no subcommand used
             habitctl.assert_habits();
             habitctl.ask(ago);
-            habitctl.log(&vec![]);
+            habitctl.log(&[]);
         }
     }
 }
@@ -129,24 +130,22 @@ impl HabitCtl {
             );
         }
 
-        let mut log_file = habitctl_dir.clone();
+        let mut log_file = habitctl_dir;
         log_file.push("log");
         if !log_file.is_file() {
             fs::File::create(&log_file).unwrap();
 
             let file = OpenOptions::new().append(true).open(&habits_file).unwrap();
-            write!(
-                &file,
-                "# The numbers specifies how often you want to do a habit:\n"
-            );
-            write!(
-                &file,
-                "# 1 means daily, 7 means weekly, 0 means you're just tracking the habit. Some examples:\n"
-            );
-            write!(
-                &file,
-                "\n# 1 Meditated\n# 7 Cleaned the apartment\n# 0 Had a headache\n# 1 Used habitctl\n"
-            );
+            writeln!(
+                &file, "\
+                # The numbers specifies how often you want to do a habit:\n\
+                # 1 means daily, 7 means weekly, 0 means you're just tracking the habit. Some examples:\n\
+                \n\
+                # 1 Meditated\n\
+                # 7 Cleaned the apartment\n\
+                # 0 Had a headache\n\
+                # 1 Used habitctl"
+            ).unwrap();
 
             println!(
                 "Created {}. This file will contain your habit log.\n",
@@ -179,13 +178,13 @@ impl HabitCtl {
 
         if let Some(last_date) = last_date {
             if last_date != entry.date {
-                write!(&file, "\n").unwrap();
+                writeln!(&file).unwrap();
             }
         }
 
-        write!(
+        writeln!(
             &file,
-            "{}\t{}\t{}\n",
+            "{}\t{}\t{}",
             &entry.date.format("%F"),
             &entry.habit,
             &entry.value
@@ -193,7 +192,7 @@ impl HabitCtl {
         .unwrap();
     }
 
-    fn log(&self, filters: &Vec<&str>) {
+    fn log(&self, filters: &[&str]) {
         let to = Local::today().naive_local();
         let from = to.checked_sub_signed(chrono::Duration::days(100)).unwrap();
 
@@ -222,7 +221,7 @@ impl HabitCtl {
                 continue;
             }
 
-            self.print_habit_row(&habit, from, to);
+            self.print_habit_row(habit, from, to);
             println!();
         }
 
@@ -239,7 +238,7 @@ impl HabitCtl {
         while current <= to {
             print!(
                 "{0: >1}",
-                &self.status_to_symbol(&self.day_status(&habit, &current))
+                &self.status_to_symbol(&self.day_status(habit, &current))
             );
 
             current = current
@@ -292,22 +291,22 @@ impl HabitCtl {
             }
 
             for habit in self.get_todo(&current) {
-                self.print_habit_row(&habit, log_from, current.clone());
-                let l = format!("[y/n/s/⏎] ");
+                self.print_habit_row(&habit, log_from, current);
+                let l = "[y/n/s/⏎] ";
 
                 let mut value;
                 loop {
-                    value = String::from(rprompt::prompt_reply_stdout(&l).unwrap());
+                    value = rprompt::prompt_reply_stdout(l).unwrap();
                     value = value.trim_end().to_string();
 
-                    if value == "y" || value == "n" || value == "s" || value == "" {
+                    if value == "y" || value == "n" || value == "s" || value.is_empty() {
                         break;
                     }
                 }
 
-                if value != "" {
+                if !value.is_empty() {
                     self.entry(&Entry {
-                        date: current.clone(),
+                        date: current,
                         habit: habit.name,
                         value,
                     });
@@ -363,7 +362,7 @@ impl HabitCtl {
 
         for line in file.lines() {
             let l = line.unwrap();
-            if l == "" {
+            if l.is_empty() {
                 continue;
             }
             let split = l.split('\t');
@@ -381,31 +380,29 @@ impl HabitCtl {
         entries
     }
 
-    fn get_entry(&self, date: &NaiveDate, habit: &String) -> Option<&Entry> {
+    fn get_entry(&self, date: &NaiveDate, habit: &str) -> Option<&Entry> {
         self.entries
             .iter()
             .find(|entry| entry.date == *date && entry.habit == *habit)
     }
 
     fn day_status(&self, habit: &Habit, date: &NaiveDate) -> DayStatus {
-        if let Some(entry) = self.get_entry(&date, &habit.name) {
+        if let Some(entry) = self.get_entry(date, &habit.name) {
             if entry.value == "y" {
                 DayStatus::Done
             } else if entry.value == "s" {
                 DayStatus::Skipped
-            } else if self.habit_satisfied(habit, &date) {
+            } else if self.habit_satisfied(habit, date) {
                 DayStatus::Satisfied
-            } else if self.habit_skipified(habit, &date) {
+            } else if self.habit_skipified(habit, date) {
                 DayStatus::Skipified
             } else {
                 DayStatus::NotDone
             }
+        } else if self.habit_warning(habit, date) {
+            DayStatus::Warning
         } else {
-            if self.habit_warning(habit, &date) {
-                DayStatus::Warning
-            } else {
-                DayStatus::Unknown
-            }
+            DayStatus::Unknown
         }
     }
 
@@ -510,15 +507,11 @@ impl HabitCtl {
     }
 
     fn first_date(&self) -> Option<NaiveDate> {
-        self.get_entries()
-            .first()
-            .and_then(|entry| Some(entry.date.clone()))
+        self.get_entries().first().map(|entry| entry.date)
     }
 
     fn last_date(&self) -> Option<NaiveDate> {
-        self.get_entries()
-            .last()
-            .and_then(|entry| Some(entry.date.clone()))
+        self.get_entries().last().map(|entry| entry.date)
     }
 
     fn get_score(&self, score_date: &NaiveDate) -> f32 {
@@ -533,7 +526,7 @@ impl HabitCtl {
             .habits
             .iter()
             .map(|habit| {
-                let status = self.day_status(&habit, &score_date);
+                let status = self.day_status(habit, score_date);
                 habit.every_days > 0
                     && (status == DayStatus::Done || status == DayStatus::Satisfied)
             })
@@ -544,7 +537,7 @@ impl HabitCtl {
             .habits
             .iter()
             .map(|habit| {
-                let status = self.day_status(&habit, &score_date);
+                let status = self.day_status(habit, score_date);
                 habit.every_days > 0
                     && (status == DayStatus::Skipped || status == DayStatus::Skipified)
             })
@@ -583,7 +576,7 @@ impl HabitCtl {
         String::from(sparks[i])
     }
 
-    fn open_file(&self, filename: &PathBuf) {
+    fn open_file(&self, filename: &Path) {
         let editor = env::var("EDITOR").unwrap_or_else(|_| String::from("vi"));
         Command::new(editor)
             .arg(filename)
