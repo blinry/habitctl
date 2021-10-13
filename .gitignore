@@ -7,3 +7,5 @@
 
 Cargo.lock
 
+result
+.direnv/
